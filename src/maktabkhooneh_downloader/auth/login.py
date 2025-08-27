@@ -1,7 +1,10 @@
+from gc import disable
+from pickle import TRUE
 from typing import Dict, Any
 
 from InquirerPy import inquirer
 from InquirerPy.base.control import Choice
+from InquirerPy.separator import Separator
 
 
 from rich.console import Console
@@ -35,7 +38,13 @@ def _save_json(data: Dict[str, Any]) -> None:
 
 
 def auto_login():
-    pass
+    console.print(
+        Panel(
+            Text("auto login coming soon...", style="bold yellow"),
+            border_style="yellow",
+        )
+    )
+    return 0
 
 
 def manual_login():
@@ -43,7 +52,7 @@ def manual_login():
         Panel(
             Text(
                 "Enter the session id copied from your browser cookies "
-                "(usually named `sessionid` or `session`).",
+                "(usually named `sessionid`).",
                 style="cyan",
             ),
             title="Manual Login",
@@ -55,7 +64,7 @@ def manual_login():
     if not session_id:
         console.print("[red]Session id cannot be empty.[/red]")
         manual_login()
-        return
+        return 2
 
     creds = _load_json()
     creds["session_id"] = session_id
@@ -67,6 +76,7 @@ def manual_login():
             border_style="green",
         )
     )
+    return 2
 
 
 def check_login() -> str:
@@ -74,18 +84,3 @@ def check_login() -> str:
     Returns the stored session_id if it exists, otherwise an empty string.
     """
     return _load_json().get("session_id", "")
-
-
-def login_menu():
-    choice = inquirer.select(
-        message="Select an option for login:",
-        choices=[
-            Choice(value=auto_login, name="🔥 Auto login (from your browser cookies)"),
-            Choice(
-                value=manual_login,
-                name="⚡ Manual login (enter your session id manually)",
-            ),
-            Choice(value=exit, name="🚪 Exit"),
-        ],
-    ).execute()
-    choice()

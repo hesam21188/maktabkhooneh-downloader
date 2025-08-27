@@ -2,36 +2,28 @@ import typer
 
 from rich.console import Console
 
-from InquirerPy import inquirer
-from InquirerPy.base.control import Choice
 
-
-from .auth.login import check_login, login_menu
-from .download.downloader import get_course
+from .menus import download_menu, login_menu
+from .auth.login import check_login
 
 console = Console()
 app = typer.Typer()
 
 
+def handle_login():
+    sessionid = check_login().strip()
+    if not sessionid:
+        login_menu()
+        handle_login()
+    else:
+        if download_menu(sessionid) == 2:
+            handle_login()
+
+
 @app.command()
 def start():
     console.print("[bold cyan]maktabkhooneh downloader[/bold cyan]")
-    sessionid = check_login()
-    if not sessionid:
-        login_menu()
-    else:
-        choice = inquirer.select(
-            message=f"logged in as sessionid: {sessionid}",
-            choices=[
-                Choice(
-                    value=get_course,
-                    name="start download 🚀",
-                ),
-                Choice(value=login_menu, name="change (login again) 🔄"),
-                Choice(value=exit, name="🚪 Exit"),
-            ],
-        ).execute()
-    choice()
+    handle_login()
 
 
 if __name__ == "__main__":
