@@ -1,6 +1,9 @@
 from codecs import charmap_build
 import time
-from InquirerPy import base
+from datetime import datetime, timedelta
+from rich.live import Live
+import schedule
+from InquirerPy import base, inquirer
 import requests
 from bs4 import BeautifulSoup
 from rich.console import Console
@@ -12,6 +15,7 @@ from rich.progress import (
     Progress,
     BarColumn,
     DownloadColumn,
+    TextColumn,
     TransferSpeedColumn,
     TimeRemainingColumn,
 )
@@ -39,7 +43,9 @@ def get_course_chapters(url):
         chapters = {}
         for chapter in data["chapters"]:
             chapters[f"{chapter["slug"]}-ch{chapter["id"]}"] = [
-                unit["slug"] for unit in chapter["unit_set"]
+                unit["slug"]
+                for unit in chapter["unit_set"]
+                if unit["type"] == "lecture"
             ]
 
         return chapters
@@ -59,16 +65,23 @@ def get_video_links(unit_links, high_quality=True):
         r = session.get(unit)
         if r.status_code == 200:
             soup = BeautifulSoup(r.text, "html.parser")
-            if high_quality:
-                yield soup.find_all(
-                    "a",
-                    attrs={"onclick": lambda x: x and "send_download_event(1)" in x},
-                )[0]["href"]
-            else:
-                yield soup.find_all(
-                    "a",
-                    attrs={"onclick": lambda x: x and "send_download_event(0)" in x},
-                )[0]["href"]
+            try:
+                if high_quality:
+                    yield soup.find_all(
+                        "a",
+                        attrs={
+                            "onclick": lambda x: x and "send_download_event(1)" in x
+                        },
+                    )[0]["href"]
+                else:
+                    yield soup.find_all(
+                        "a",
+                        attrs={
+                            "onclick": lambda x: x and "send_download_event(0)" in x
+                        },
+                    )[0]["href"]
+            except IndexError:
+                pass
 
 
 def download_video(url, filepath):
@@ -123,8 +136,9 @@ def download_video(url, filepath):
     print(f"✅ Download completed: {filepath}")
 
 
-def start_download(sessionid):
-    course_url = Prompt.ask("course url", console=console).strip().split("/")[-1]
+def start_download(sessionid, course_url=""):
+    if not course_url:
+        course_url = Prompt.ask("course url", console=console).strip().split("/")[-1]
     if not check_course(course_url, sessionid):
         console.print(
             Panel(
@@ -147,170 +161,103 @@ def start_download(sessionid):
     return 1
 
 
-# {
-#     "فصل-اول-مقدمه": ["ویدیو-مقدمه"],
-#     "فصل-دوم-آزمایشگاه": [
-#         "ویدیو-ماشین-مجازی",
-#         "ویدیو-نصب-سیستم-عامل-کالی",
-#         "ویدیو-metasploitable",
-#         "ویدیو-owaspbwa",
-#     ],
-#     "فصل-سوم-اصطلاحات-ceh": [
-#         "ویدیو-اصطلاحات-هک-اخلاقی",
-#         "ویدیو-اصطلاحات-امنیت-اطلاعات",
-#         "ویدیو-اصطلاحات-حمله",
-#         "ویدیو-مراحل-هک",
-#         "ویدیو-اخبار-بارهی-هک",
-#         "ویدیو-مبانی-هک",
-#         "تمرین-کوییز",
-#     ],
-#     "فصل-چهارم-بررسی-شناسایی-درپاها": [
-#         "ویدیو-مقدمه-پیدا-کردن-ردپا",
-#         "ویدیو-هک-گوگل",
-#         "ویدیو-مهندسی-اجتماعی",
-#         "ویدیو-بررسی-وبسات",
-#         "ویدیو-هدر-ایمیل",
-#         "ویدیو-dns",
-#         "تمرین-کوییز",
-#         "پروژه-پروژه",
-#     ],
-#     "فصل-پنجم-اسکن-سیستماتیک-شبکه": [
-#         "ویدیو-مقدمه-اسکن-سیستماتیک",
-#         "ویدیو-مبانی-اسکن-پورتها",
-#         "ویدیو-hping3",
-#         "ویدیو-nmap",
-#         "ویدیو-idle",
-#         "ویدیو-پیدا-کردن-ردپا",
-#         "ویدیو-nessus",
-#         "ویدیو-solar-network-mapper",
-#         "ویدیو-scapy",
-#         "ویدیو-proxies",
-#         "تمرین-کوییز",
-#     ],
-#     "فصل-ششم-سرشماری": [
-#         "ویدیو-مقدمه-سرشماری",
-#         "ویدیو-windows",
-#         "ویدیو-linux",
-#         "ویدیو-netbios",
-#         "ویدیو-dns",
-#         "ویدیو-snmp",
-#         "ویدیو-idap",
-#         "ویدیو-ntp",
-#         "ویدیو-smtp",
-#         "تمرین-کوییز",
-#     ],
-#     "فصل-هفتم-هک-کردن-سیستم": [
-#         "ویدیو-مقدمه-هک-کردن-سیستم",
-#         "ویدیو-رمزعبور-قسمت-1",
-#         "ویدیو-رمزعبور-قسمت-۲",
-#         "ویدیو-رمزعبور-قسمت-۳",
-#         "ویدیو-رمزعبور-قسمت-4",
-#         "ویدیو-اجرا",
-#         "ویدیو-بالا-بردن-دسترسی-privilege-escalation",
-#         "ویدیو-مسیرهای-مخفی",
-#         "ویدیو-دادههای-مخفی",
-#         "ویدیو-msfvenom-backdoor",
-#         "ویدیو-yersinia",
-#         "تمرین-کوییز",
-#         "پروژه-پروژه",
-#     ],
-#     "فصل-هشتم-بدافزار": [
-#         "ویدیو-مقدمه-بدافزار",
-#         "ویدیو-جاسوسافزار",
-#         "ویدیو-تروجان",
-#         "ویدیو-ویروس",
-#         "ویدیو-تشخیص",
-#         "ویدیو-چرخه",
-#         "ویدیو-تایید-فایل",
-#         "ویدیو-آنالیز",
-#         "ویدیو-سرریز-بافر",
-#         "تمرین-کوییز",
-#     ],
-#     "فصل-نهم-شنود": [
-#         "ویدیو-مقدمه-شنود",
-#         "ویدیو-tcpdump-wireshark",
-#         "ویدیو-cam",
-#         "ویدیو-dhcp-snooping",
-#         "ویدیو-arp",
-#         "تمرین-کوییز",
-#         "پروژه-پروژه",
-#     ],
-#     "فصل-دهم-مهندسی-اجتماعی": [
-#         "ویدیو-مقدمه-مهندسی-اجتماعی",
-#         "ویدیو-فازهای-مهندسی-اجتماعی",
-#         "ویدیو-حمله",
-#         "ویدیو-جلوگیری",
-#         "تمرین-کوییز",
-#     ],
-#     "فصل-یازدهم-dos": [
-#         "ویدیو-مقدمه-dos",
-#         "ویدیو-لایههای-dos",
-#         "ویدیو-hping3",
-#         "ویدیو-جلوگیری",
-#         "تمرین-کوییز",
-#     ],
-#     "فصل-دوازدهم-نشست-ربایی": [
-#         "ویدیو-مقدمه-لایههای-شبکه",
-#         "ویدیو-لایههای-برنامه",
-#         "ویدیو-جلوگیری",
-#         "تمرین-کوییز",
-#     ],
-#     "فصل-سیزدهم-سرورها-برنامه-وب": [
-#         "ویدیو-مقدمه-سرورها-برنامههای-وب",
-#         "ویدیو-حمله",
-#         "ویدیو-handson",
-#         "تمرین-کوییز",
-#     ],
-#     "فصل-چهاردهم-تزریق-پایگاه-داده": [
-#         "ویدیو-مقدمه-تزریق-پایگاهداده",
-#         "ویدیو-حمله",
-#         "ویدیو-ابزارهای-جلوگیری",
-#         "ویدیو-handson",
-#         "تمرین-کوییز",
-#         "پروژه-پروژه",
-#     ],
-#     "فصل-پانزدهم-امنیت-wifi": [
-#         "ویدیو-مقدمه-امنیت-wifi",
-#         "ویدیو-jargon",
-#         "ویدیو-waves",
-#         "ویدیو-استانداردها-مقررات",
-#         "ویدیو-hidden-ssid",
-#         "ویدیو-mac-filter",
-#         "ویدیو-wpa2-cracking",
-#         "ویدیو-rouge",
-#         "ویدیو-miss-association-evil-twin",
-#         "ویدیو-bt-mobile",
-#         "ویدیو-دفاع",
-#         "تمرین-کوییز",
-#         "پروژه-پروژه",
-#     ],
-#     "فصل-شانزدهم-دستگاههای-قابل-حمل": ["ویدیو-toward", "ویدیو-دفاع", "تمرین-کوییز"],
-#     "فصل-هفدهم-گریز": [
-#         "ویدیو-مقدمه-ابزارها",
-#         "ویدیو-honeypots",
-#         "ویدیو-تکنیکهای-فرار",
-#         "تمرین-کوییز",
-#     ],
-#     "فصل-هجدهم-ابر": ["ویدیو-مقدمه-ابر", "ویدیو-نگرانیها", "تمرین-کوییز"],
-#     "فصل-نوزدهم-رمزنگاری": [
-#         "ویدیو-مقدمه-رمزنگاری",
-#         "ویدیو-اصول-رمزنگاری",
-#         "ویدیو-symmetric",
-#         "ویدیو-asymmetric",
-#         "ویدیو-cas",
-#         "ویدیو-hashes",
-#         "تمرین-کوییز",
-#         "پروژه-پروژه",
-#     ],
-#     "فصل-بیستم-امنیت-فیزیکی": ["ویدیو-امنیت-فیزیکی", "تمرین-کوییز"],
-#     "فصل-بیست-یکم-معماری-طراحی-امنیتی": [
-#         "ویدیو-چارت-سازمانی",
-#         "ویدیو-معماری-برنامه",
-#         "تمرین-کوییز",
-#     ],
-#     "فصل-بیست-دوم-اینترنت-اشیا": [
-#         "ویدیو-اینترنت-اشیا",
-#         "ویدیو-ادامه-آموزش",
-#         "تمرین-کوییز",
-#     ],
-# }
+def video_links_txt(sessionid):
+    console = Console()
+    course_url = Prompt.ask("course url", console=console).strip().split("/")[-1]
+
+    if not check_course(course_url, sessionid):
+        console.print(
+            Panel(
+                Text("you have to buy the course first", style="bold red"),
+                border_style="red",
+            )
+        )
+        return 0
+
+    chapters = get_course_chapters(course_url)
+    unit_links = get_unit_links(course_url, chapters)
+    total = len(unit_links)
+
+    with open(f"{course_url}.txt", "a", encoding="utf-8") as file:
+        with Progress(
+            TextColumn("[progress.description]{task.description}"),
+            BarColumn(),
+            TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
+            TimeRemainingColumn(),
+            TextColumn("[blue]{task.completed}/{task.total}"),
+            console=console,
+        ) as progress:
+            task = progress.add_task("Processing...", total=total)
+            for video_link in get_video_links(unit_links):
+                file.write(f"{video_link}\n")
+                progress.update(task, advance=1)
+                time.sleep(0.2)
+    console.print(
+        Panel(
+            Text("✅ your file is valid until the next hour", style="bold yellow"),
+            border_style="green",
+        )
+    )
+    return 1
+
+
+def schedule_download(sessionid):
+    course_url = Prompt.ask("course url", console=console).strip().split("/")[-1]
+    hours = [f"{i:02d}" for i in range(24)]
+    minutes = [f"{i:02d}" for i in range(0, 60, 5)]
+
+    console.print("🕐 [bold blue]Select your download time[/bold blue]")
+    hour = inquirer.select(
+        message="Choose hour:",
+        choices=hours,
+        default="00",
+    ).execute()
+    minute = inquirer.select(
+        message="Choose minutes:",
+        choices=minutes,
+        default="00",
+    ).execute()
+
+    console.print(f"[bold green]Download scheduled for {hour}:{minute}[/bold green]")
+
+    now = datetime.now()
+    target_time = now.replace(
+        hour=int(hour), minute=int(minute), second=0, microsecond=0
+    )
+    if target_time <= now:
+        target_time += timedelta(days=1)
+
+    with Live(console=console, refresh_per_second=1) as live:
+        while True:
+            now = datetime.now()
+
+            if now >= target_time:
+                break
+
+            remaining = target_time - now
+            total_seconds = int(remaining.total_seconds())
+            hours_left, remainder = divmod(total_seconds, 3600)
+            minutes_left, seconds_left = divmod(remainder, 60)
+
+            text = Text()
+            text.append("⏰ ", style="yellow bold")
+            text.append("Time left: ", style="white bold")
+
+            if hours_left > 0:
+                text.append(f"{hours_left:02d}h ", style="cyan bold")
+            if minutes_left > 0:
+                text.append(f"{minutes_left:02d}m ", style="magenta bold")
+            if hours_left == 0 and minutes_left == 0 and seconds_left > 0:
+                text.append(f"{seconds_left:02d}s", style="magenta bold")
+
+            live.update(text)
+
+            if total_seconds > 60:
+                sleep_duration = min(60, total_seconds - 60)
+            else:
+                sleep_duration = 1
+
+    console.print(
+        "[bold green]scheduled time reached! Starting download...[/bold green]"
+    )
+    return start_download(sessionid, course_url=course_url)

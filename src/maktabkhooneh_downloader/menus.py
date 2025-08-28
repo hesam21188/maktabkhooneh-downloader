@@ -3,7 +3,7 @@ from InquirerPy import inquirer
 from InquirerPy.separator import Separator
 from InquirerPy.base.control import Choice
 from click.utils import R
-from .download.downloader import start_download
+from .download.downloader import start_download, video_links_txt, schedule_download
 from .auth.login import auto_login, manual_login
 from maktabkhooneh_downloader.auth import login
 
@@ -15,6 +15,14 @@ def download_menu(sessionid):
             Choice(
                 value=lambda: start_download(sessionid),
                 name="start download 🚀",
+            ),
+            Choice(
+                value=lambda: schedule_download(sessionid),
+                name="schedule download ⏰",
+            ),
+            Choice(
+                value=lambda: video_links_txt(sessionid),
+                name="get txt file of video links (for IDM) 📥",
             ),
             Choice(
                 value=login_menu,
