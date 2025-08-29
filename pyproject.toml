@@ -1,7 +1,7 @@
 [project]
-name = "maktabkhooneh-downloader"
-version = "0.2.2"
-description = "Effortlessly download Maktabkhooneh courses with speed and smart features"
+name = "mkdl"
+version = "0.2.2b1"
+description = "Effortlessly download Maktabkhooneh.org courses with speed and smart features"
 authors = [
     {name = "hesam21188", email = "hosseinharatii@gmail.com"}
 ]
