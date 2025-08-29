@@ -2,7 +2,7 @@ from codecs import charmap_build
 import time
 from datetime import datetime, timedelta
 from rich.live import Live
-import schedule
+from pathlib import Path
 from InquirerPy import base, inquirer
 import requests
 from bs4 import BeautifulSoup
@@ -25,7 +25,7 @@ console = Console()
 session = requests.Session()
 
 
-def check_course(url, sessionid):
+def _check_course(url, sessionid):
     base_url = f"https://maktabkhooneh.org/api/v1/sale/{url}/prices"
     session.cookies.set("sessionid", sessionid)
     r = session.get(base_url)
@@ -35,7 +35,7 @@ def check_course(url, sessionid):
     return False
 
 
-def get_course_chapters(url):
+def _get_course_chapters(url):
     base_url = f"https://maktabkhooneh.org/api/v1/courses/{url}/chapters/"
     r = session.get(base_url)
     if r.status_code == 200:
@@ -51,7 +51,7 @@ def get_course_chapters(url):
         return chapters
 
 
-def get_unit_links(url, chapters):
+def _get_unit_links(url, chapters):
     base_url = f"https://maktabkhooneh.org/course/{url}"
     unit_links = []
     for chapter in chapters:
@@ -60,7 +60,7 @@ def get_unit_links(url, chapters):
     return unit_links
 
 
-def get_video_links(unit_links, high_quality=True):
+def _get_video_links(unit_links, high_quality=True):
     for unit in unit_links:
         r = session.get(unit)
         if r.status_code == 200:
@@ -84,7 +84,7 @@ def get_video_links(unit_links, high_quality=True):
                 pass
 
 
-def download_video(url, filepath):
+def _download_video(url, filepath):
     """
     Download a video to the specified path with resume support.
     Assumes 'filepath' always includes directory (e.g., 'folder/video.mp4').
@@ -136,10 +136,19 @@ def download_video(url, filepath):
     print(f"✅ Download completed: {filepath}")
 
 
+def _normalize_file_name(unit_links):
+    file_name = unit_links[i].split("/")[-2:]
+    file_name[0] = "-".join(file_name[0].split("-")[:-1])
+    file_name[1:1] = ["/"]
+    file_name.append(".mp4")
+    file_name = "".join(file_name)
+    return str(Path.cwd() / file_name)
+
+
 def start_download(sessionid, course_url=""):
     if not course_url:
         course_url = Prompt.ask("course url", console=console).strip().split("/")[-1]
-    if not check_course(course_url, sessionid):
+    if not _check_course(course_url, sessionid):
         console.print(
             Panel(
                 Text("you have to buy the course first", style="bold red"),
@@ -147,16 +156,12 @@ def start_download(sessionid, course_url=""):
             )
         )
         return 0
-    chapters = get_course_chapters(course_url)
-    unit_links = get_unit_links(course_url, chapters)
+    chapters = _get_course_chapters(course_url)
+    unit_links = _get_unit_links(course_url, chapters)
 
-    for i, video_link in enumerate(get_video_links(unit_links)):
-        file_name = unit_links[i].split("/")[-2:]
-        file_name[0] = "-".join(file_name[0].split("-")[:-1])
-        file_name[1:1] = ["/"]
-        file_name.append(".mp4")
-        file_name = "".join(file_name)
-        download_video(video_link, file_name)
+    for i, video_link in enumerate(_get_video_links(unit_links)):
+        file_name = _normalize_file_name(unit_links)
+        _download_video(video_link, file_name)
 
     return 1
 
@@ -165,7 +170,7 @@ def video_links_txt(sessionid):
     console = Console()
     course_url = Prompt.ask("course url", console=console).strip().split("/")[-1]
 
-    if not check_course(course_url, sessionid):
+    if not _check_course(course_url, sessionid):
         console.print(
             Panel(
                 Text("you have to buy the course first", style="bold red"),
@@ -174,11 +179,11 @@ def video_links_txt(sessionid):
         )
         return 0
 
-    chapters = get_course_chapters(course_url)
-    unit_links = get_unit_links(course_url, chapters)
+    chapters = _get_course_chapters(course_url)
+    unit_links = _get_unit_links(course_url, chapters)
     total = len(unit_links)
 
-    with open(f"{course_url}.txt", "a", encoding="utf-8") as file:
+    with open(str(Path.cwd() / f"{course_url}.txt"), "a", encoding="utf-8") as file:
         with Progress(
             TextColumn("[progress.description]{task.description}"),
             BarColumn(),
@@ -188,7 +193,7 @@ def video_links_txt(sessionid):
             console=console,
         ) as progress:
             task = progress.add_task("Processing...", total=total)
-            for video_link in get_video_links(unit_links):
+            for video_link in _get_video_links(unit_links):
                 file.write(f"{video_link}\n")
                 progress.update(task, advance=1)
                 time.sleep(0.2)

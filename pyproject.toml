@@ -1,6 +1,6 @@
 [project]
 name = "maktabkhooneh-downloader"
-version = "0.2.0"
+version = "0.2.1"
 description = "Effortlessly download Maktabkhooneh courses with speed and smart features"
 authors = [
     {name = "hesam21188", email = "hosseinharatii@gmail.com"}
