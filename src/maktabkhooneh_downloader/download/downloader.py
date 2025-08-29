@@ -136,7 +136,7 @@ def _download_video(url, filepath):
     print(f"✅ Download completed: {filepath}")
 
 
-def _normalize_file_name(unit_links):
+def _normalize_file_name(unit_links, i):
     file_name = unit_links[i].split("/")[-2:]
     file_name[0] = "-".join(file_name[0].split("-")[:-1])
     file_name[1:1] = ["/"]
@@ -160,7 +160,7 @@ def start_download(sessionid, course_url=""):
     unit_links = _get_unit_links(course_url, chapters)
 
     for i, video_link in enumerate(_get_video_links(unit_links)):
-        file_name = _normalize_file_name(unit_links)
+        file_name = _normalize_file_name(unit_links, i)
         _download_video(video_link, file_name)
 
     return 1
