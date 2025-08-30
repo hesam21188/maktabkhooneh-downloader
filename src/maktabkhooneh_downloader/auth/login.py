@@ -13,6 +13,7 @@ from rich.prompt import Prompt
 from rich.text import Text
 from pathlib import Path
 import json
+from .browsers import get_sessionid
 
 CREDS_PATH: Path = Path.home() / ".maktabkhooneh_dl" / "session.json"
 CREDS_PATH.parent.mkdir(parents=True, exist_ok=True)
@@ -38,13 +39,27 @@ def _save_json(data: Dict[str, Any]) -> None:
 
 
 def auto_login():
+    confirm = inquirer.confirm(
+        message="Continue since all browsers are closed?", default=True
+    ).execute()
+
+    session_id = get_sessionid()
+    if not session_id:
+        console.print(
+            "[red]No browser with an active login was found. Try logging in manually.[/red]"
+        )
+        manual_login()
+        return 2
+    creds = _load_json()
+    creds["session_id"] = session_id
+    _save_json(creds)
     console.print(
         Panel(
-            Text("auto login coming soon...", style="bold yellow"),
-            border_style="yellow",
+            Text("Session id saved successfully!", style="bold green"),
+            border_style="green",
         )
     )
-    return 0
+    return 2
 
 
 def manual_login():
